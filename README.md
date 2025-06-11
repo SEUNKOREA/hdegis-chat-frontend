@@ -1,35 +1,34 @@
 # hdegis-chat-frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+## Quickstart
 
-## Recommended IDE Setup
-
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+### 0. Setup
 
 ```sh
+# nvm 다운로드 및 설치:
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+# Node.js 다운로드 및 설치:
+nvm install 22
+
+# Node.js 버전 확인:
+node -v # "v22.16.0"가 출력되어야 합니다.
+
+# npm 버전 확인:
+npm -v # 10.9.2가 출력되어야 합니다.
+
+# reference: https://nodejs.org/ko/download
+```
+
+### 1. Run
+```sh
+# Clone repository
+git clone https://gitlab.hd-aic.com/lse/hdegis-chat-frontend.git
+cd hdegis-chat-frontend
+
+# 패키지 설치
 npm install
-```
 
-### Compile and Hot-Reload for Development
-
-```sh
+# 개발 서버 실행
 npm run dev
-```
-
-### Compile and Minify for Production
-
-```sh
-npm run build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
 ```
