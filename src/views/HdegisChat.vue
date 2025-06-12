@@ -2,6 +2,7 @@
 import ChatSidebar from '@/components/ChatSidebar.vue'
 import ChatMain from '@/components/ChatMain.vue'
 import PdfViewer from '@/components/PdfViewer.vue'
+import ChatService from '@/services/chat_service.js'
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 // 채팅 세션 데이터 구조
@@ -19,6 +20,9 @@ const currentPdfUrl = ref('')
 const currentPdfPage = ref(1)
 const currentPdfFileName = ref('')
 const currentSearchResults = ref([])
+
+// 메시지 전송 상태
+const isMessageSending = ref(false)
 
 // 현재 활성 세션의 메시지들을 계산된 속성으로 가져오기
 const messages = computed(() => {
@@ -85,41 +89,14 @@ function generateSessionTitle(firstMessage, sessionNumber) {
 }
 
 /**
- * 샘플 검색 결과 생성 (실제 API 연동 전까지 사용)
+ * 사용자가 메시지를 전송했을 때 처리하는 함수 (백엔드 연동)
  */
-function generateSampleSearchResults() {
-  return [
-    {
-      fileName: 'sample.pdf',
-      filePath: 'sample.pdf',
-      pageNumber: 5,
-      score: 0.92,
-      preview:
-        '고압차단기의 동작 원리에 대한 설명이 포함된 내용입니다. 차단기는 전력 시스템에서 중요한 역할을 담당하며...',
-    },
-    {
-      fileName: 'sample.pdf',
-      filePath: 'sample.pdf',
-      pageNumber: 12,
-      score: 0.87,
-      preview:
-        '안전 규정 및 유지보수 가이드라인이 명시되어 있습니다. 정기적인 점검과 관리가 필요하며...',
-    },
-    {
-      fileName: 'sample.pdf',
-      filePath: 'sample.pdf',
-      pageNumber: 18,
-      score: 0.81,
-      preview:
-        '기술적 사양 및 성능 지표에 대한 상세한 정보가 포함되어 있습니다. 전압, 전류 등의 파라미터...',
-    },
-  ]
-}
+async function handleSend(messageData) {
+  if (isMessageSending.value) {
+    console.warn('이미 메시지를 전송 중입니다.')
+    return
+  }
 
-/**
- * 사용자가 메시지를 전송했을 때 처리하는 함수
- */
-function handleSend(messageData) {
   const { text, filters } = messageData
 
   // 현재 세션이 없으면 새로 생성
@@ -154,48 +131,68 @@ function handleSend(messageData) {
   currentSession.updatedAt = new Date()
   currentSession.lastMessage = text.trim()
 
-  // 선택된 필터 정보 로깅
-  console.log('메시지 전송:', {
-    text: text.trim(),
-    selectedFilters: filters,
-    sessionId: currentSessionId.value,
-  })
-
-  // 봇 응답 시뮬레이션 (실제로는 API 호출)
-  setTimeout(() => {
-    const botMessage = {
-      from: 'bot',
-      text: generateBotResponse(filters),
-      timestamp: new Date(),
-      searchResults: generateSampleSearchResults(), // 샘플 검색 결과 추가
-    }
-
-    currentSession.messages.push(botMessage)
-    currentSession.updatedAt = new Date()
-    currentSession.lastMessage = botMessage.text
-
-    // 로컬 스토리지에 저장
-    saveSessions()
-  }, 600)
-
   // 로컬 스토리지에 저장
   saveSessions()
-}
 
-/**
- * 필터 기반 봇 응답 생성 (시뮬레이션)
- */
-function generateBotResponse(filters) {
-  if (filters.length === 0) {
-    return '알겠습니다. 전체 문서를 기반으로 답변드리겠습니다. 고압차단기의 동작 원리는 다음과 같습니다...'
+  // 메시지 전송 시작
+  isMessageSending.value = true
+
+  // 봇 응답 메시지 틀 먼저 추가
+  const botMessage = {
+    from: 'bot',
+    text: '',
+    timestamp: new Date(),
+    searchResults: [],
   }
+  currentSession.messages.push(botMessage)
 
-  const filterNames = filters.map((filter) => {
-    const parts = filter.split('/')
-    return parts[parts.length - 1]
-  })
+  try {
+    console.log('백엔드로 스트리밍 요청 전송:', {
+      query: text.trim(),
+      filters: filters,
+    })
 
-  return `선택하신 문서 카테고리(${filterNames.join(', ')})를 기반으로 답변드리겠습니다. 관련 문서에서 다음과 같은 정보를 찾았습니다...`
+    // 백엔드에 스트리밍 요청
+    const stream = await ChatService.sendStreamingMessage(text.trim(), filters)
+
+    // 스트림 처리
+    await ChatService.processStreamingResponse(stream, {
+      onSearchResults: (searchResults) => {
+        console.log('검색 결과 수신:', searchResults)
+        // 검색 결과를 현재 봇 메시지에 저장
+        botMessage.searchResults = searchResults || []
+        currentSession.updatedAt = new Date()
+        saveSessions()
+      },
+
+      onResponseChunk: (chunk) => {
+        // 응답 청크를 봇 메시지에 추가
+        botMessage.text += chunk
+        currentSession.updatedAt = new Date()
+        currentSession.lastMessage = botMessage.text.slice(0, 50) + '...'
+        // 실시간 업데이트를 위해 저장하지 않고 반응형으로만 처리
+      },
+
+      onCompleted: () => {
+        console.log('스트리밍 완료')
+        isMessageSending.value = false
+        // 최종 상태 저장
+        saveSessions()
+      },
+
+      onError: (error) => {
+        console.error('스트리밍 오류:', error)
+        botMessage.text = '죄송합니다. 응답 생성 중 오류가 발생했습니다.'
+        isMessageSending.value = false
+        saveSessions()
+      },
+    })
+  } catch (error) {
+    console.error('메시지 전송 실패:', error)
+    botMessage.text = '네트워크 오류가 발생했습니다. 다시 시도해 주세요.'
+    isMessageSending.value = false
+    saveSessions()
+  }
 }
 
 /**
@@ -204,9 +201,10 @@ function generateBotResponse(filters) {
 function handleShowPdf(searchResult) {
   console.log('PDF 표시 요청:', searchResult)
 
-  currentPdfUrl.value = searchResult.filePath
-  currentPdfPage.value = searchResult.pageNumber
-  currentPdfFileName.value = searchResult.fileName
+  // 실제 백엔드에서 받은 경로 사용
+  currentPdfUrl.value = searchResult.filePath || 'public/sample.pdf'
+  currentPdfPage.value = searchResult.pageNumber || 1
+  currentPdfFileName.value = searchResult.fileName || 'Document.pdf'
   currentSearchResults.value = [searchResult]
   showPdfPanel.value = true
 
@@ -451,10 +449,27 @@ function loadSessions() {
   }
 }
 
+/**
+ * 백엔드 헬스 체크
+ */
+async function checkBackendHealth() {
+  try {
+    const isHealthy = await ChatService.healthCheck()
+    if (isHealthy) {
+      console.log('백엔드 서버 연결 확인됨')
+    } else {
+      console.warn('백엔드 서버 응답 없음')
+    }
+  } catch (error) {
+    console.error('백엔드 연결 확인 실패:', error)
+  }
+}
+
 // 컴포넌트 마운트 시 이벤트 리스너 등록 및 세션 데이터 로드
 onMounted(() => {
   handleResize() // 초기 화면 크기 체크
   loadSessions() // 저장된 세션 데이터 로드
+  checkBackendHealth() // 백엔드 연결 확인
   window.addEventListener('resize', handleResize)
 })
 
@@ -543,4 +558,3 @@ onUnmounted(() => {
   }
 }
 </style>
-*
