@@ -50,7 +50,7 @@
           <div
             v-for="(message, index) in messages"
             :key="`msg-${index}`"
-            :class="['message-bubble', `message-${message.from}`]"
+            :class="['message-bubble', `message-${message.from}`, { 'streaming': message.isStreaming }]"
           >
             <!-- 사용자 메시지에 필터 정보 표시 -->
             <div
@@ -81,7 +81,22 @@
             </div>
 
             <div class="message-content">
-              {{ message.text }}
+              <!-- 타이핑 애니메이션을 위한 개선된 텍스트 렌더링 -->
+              <div 
+                v-if="message.from === 'bot'"
+                class="bot-message-text"
+                v-html="formatBotMessage(message.text, message.isStreaming)"
+              ></div>
+              <div v-else>{{ message.text }}</div>
+            </div>
+
+            <!-- 타이핑 인디케이터 -->
+            <div v-if="message.from === 'bot' && message.isStreaming && !message.text" class="typing-indicator">
+              <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
             </div>
 
             <!-- 봇 메시지에 검색 결과 표시 -->
@@ -184,6 +199,26 @@ const expandedFilters = ref({}) // 메시지별 필터 펼침 상태
 const isWelcomeMode = computed(() => props.messages.length === 0)
 
 /**
+ * 봇 메시지 포맷팅 (타이핑 효과 포함)
+ */
+function formatBotMessage(text, isStreaming = false) {
+  if (!text) return ''
+  
+  // 마크다운 스타일 텍스트를 HTML로 변환 (간단한 변환)
+  let formattedText = text
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+  
+  // 스트리밍 중일 때 커서 효과 추가
+  if (isStreaming && text) {
+    formattedText += '<span class="typing-cursor">|</span>'
+  }
+  
+  return formattedText
+}
+
+/**
  * 메시지 전송 처리 함수
  */
 function sendMessage() {
@@ -249,18 +284,25 @@ function handleFilterChange(filters) {
 }
 
 /**
- * 메시지 목록을 하단으로 스크롤하는 함수
+ * 메시지 목록을 하단으로 스크롤하는 함수 (throttle 적용)
  */
+let scrollTimeout = null
 function scrollToBottom() {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      const container = messagesContainer.value
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'smooth',
-      })
-    }
-  })
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
+  }
+  
+  scrollTimeout = setTimeout(() => {
+    nextTick(() => {
+      if (messagesContainer.value) {
+        const container = messagesContainer.value
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth',
+        })
+      }
+    })
+  }, 50) // 50ms throttle
 }
 
 /**
@@ -293,16 +335,18 @@ function getFilterDisplayName(filterPath) {
   return filterPath
 }
 
-// 메시지 배열 변화 감지하여 자동 스크롤
+// 메시지 배열 변화 감지하여 자동 스크롤 (성능 최적화)
 watch(
   () => props.messages,
   (newMessages, oldMessages) => {
-    // 새 메시지가 추가된 경우에만 스크롤
-    if (newMessages.length > (oldMessages?.length || 0)) {
+    // 새 메시지가 추가되거나 마지막 메시지가 업데이트된 경우
+    if (newMessages.length !== (oldMessages?.length || 0) || 
+        (newMessages.length > 0 && oldMessages?.length > 0 && 
+         newMessages[newMessages.length - 1].text !== oldMessages[oldMessages.length - 1]?.text)) {
       scrollToBottom()
     }
   },
-  { deep: true },
+  { deep: true }
 )
 
 // 환영 모드 변화 감지하여 적절한 입력창에 포커스
@@ -605,6 +649,84 @@ onMounted(() => {
   color: var(--color-text);
   border: 1px solid var(--color-border);
   border-bottom-left-radius: 0.5rem;
+}
+
+/* 봇 메시지 텍스트 스타일 */
+.bot-message-text {
+  line-height: 1.5;
+}
+
+/* 타이핑 커서 애니메이션 */
+.typing-cursor {
+  animation: blink 1s infinite;
+  color: #3498db;
+  font-weight: bold;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* 타이핑 인디케이터 */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.typing-dots {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.typing-dots span {
+  width: 8px;
+  height: 8px;
+  background-color: #3498db;
+  border-radius: 50%;
+  animation: typing 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  30% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 봇 메시지에 스트리밍 클래스 추가 시 스타일 */
+.message-bot.streaming .message-content {
+  border-bottom-left-radius: 0.5rem;
+  position: relative;
+}
+
+.message-bot.streaming .message-content::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #3498db, transparent);
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* 검색 결과 스타일 */
