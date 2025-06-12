@@ -143,9 +143,14 @@ async function handleSend(messageData) {
     text: '',
     timestamp: new Date(),
     searchResults: [],
-    isStreaming: true, // 스트리밍 상태 추가
+    isStreaming: true, // 스트리밍 시작
+    answerCompleted: false, // 답변 완료 여부
+    showReferences: false, // 참조문서 표시 여부
   }
+  
+  // 봇 메시지를 현재 세션에 추가
   currentSession.messages.push(botMessage)
+  const botMessageIndex = currentSession.messages.length - 1
 
   try {
     console.log('백엔드로 스트리밍 요청 전송:', {
@@ -158,43 +163,61 @@ async function handleSend(messageData) {
 
     // 스트림 처리
     await ChatService.processStreamingResponse(stream, {
-      onSearchResults: (searchResults) => {
-        console.log('검색 결과 수신:', searchResults)
-        // 검색 결과를 현재 봇 메시지에 저장
-        botMessage.searchResults = searchResults || []
-        currentSession.updatedAt = new Date()
-        
-        // Vue의 반응형 시스템이 감지할 수 있도록 강제 업데이트
-        currentSession.messages = [...currentSession.messages]
-        saveSessions()
+      onResponseChunk: (chunk) => {
+        // 답변 청크를 봇 메시지에 실시간으로 추가
+        const currentBotMessage = currentSession.messages[botMessageIndex]
+        if (currentBotMessage) {
+          currentBotMessage.text += chunk
+          currentBotMessage.isStreaming = true
+          
+          // 마지막 메시지 업데이트 (미리보기용)
+          const previewText = currentBotMessage.text.length > 50 
+            ? currentBotMessage.text.slice(0, 50) + '...' 
+            : currentBotMessage.text
+          currentSession.lastMessage = previewText || '응답 중...'
+          
+          // 세션 업데이트 시간 갱신
+          currentSession.updatedAt = new Date()
+        }
       },
 
-      onResponseChunk: (chunk) => {
-        // 응답 청크를 봇 메시지에 실시간으로 추가
-        botMessage.text += chunk
-        botMessage.isStreaming = true
-        currentSession.updatedAt = new Date()
-        
-        // Vue의 반응형 시스템이 변화를 감지할 수 있도록 배열 참조 변경
-        currentSession.messages = [...currentSession.messages]
-        
-        // 마지막 메시지 업데이트 (미리보기용)
-        const previewText = botMessage.text.length > 50 
-          ? botMessage.text.slice(0, 50) + '...' 
-          : botMessage.text
-        currentSession.lastMessage = previewText || '응답 중...'
+      onResponseCompleted: () => {
+        console.log('답변 스트리밍 완료')
+        const currentBotMessage = currentSession.messages[botMessageIndex]
+        if (currentBotMessage) {
+          currentBotMessage.isStreaming = false // 스트리밍 완료
+          currentBotMessage.answerCompleted = true // 답변 완료 표시
+          
+          // 최종 답변으로 마지막 메시지 업데이트
+          const finalPreview = currentBotMessage.text.length > 50 
+            ? currentBotMessage.text.slice(0, 50) + '...' 
+            : currentBotMessage.text
+          currentSession.lastMessage = finalPreview
+          
+          // 세션 업데이트 시간 갱신
+          currentSession.updatedAt = new Date()
+        }
+      },
+
+      onSearchResults: (searchResults) => {
+        console.log('검색 결과 수신:', searchResults)
+        const currentBotMessage = currentSession.messages[botMessageIndex]
+        if (currentBotMessage) {
+          // 검색 결과를 봇 메시지에 저장
+          currentBotMessage.searchResults = searchResults || []
+          
+          // 지연 후 참조문서 표시
+          setTimeout(() => {
+            currentBotMessage.showReferences = true
+            currentSession.updatedAt = new Date()
+            saveSessions()
+          }, 300) // 300ms 지연으로 자연스러운 등장
+        }
       },
       
       onCompleted: () => {
-        console.log('스트리밍 완료')
-        botMessage.isStreaming = false // 스트리밍 완료
+        console.log('전체 스트리밍 프로세스 완료')
         isMessageSending.value = false
-        
-        // 최종 상태로 업데이트
-        currentSession.messages = [...currentSession.messages]
-        currentSession.lastMessage = botMessage.text.length > 50 
-          ? botMessage.text.slice(0, 50) + '...' 
-          : botMessage.text
         
         // 최종 상태 저장
         saveSessions()
@@ -202,23 +225,31 @@ async function handleSend(messageData) {
 
       onError: (error) => {
         console.error('스트리밍 오류:', error)
-        botMessage.text = '죄송합니다. 응답 생성 중 오류가 발생했습니다.'
-        botMessage.isStreaming = false
+        const currentBotMessage = currentSession.messages[botMessageIndex]
+        if (currentBotMessage) {
+          currentBotMessage.text = '죄송합니다. 응답 생성 중 오류가 발생했습니다.'
+          currentBotMessage.isStreaming = false
+          currentBotMessage.answerCompleted = true
+          currentSession.lastMessage = '오류 발생'
+        }
         isMessageSending.value = false
         
-        // 에러 상태로 업데이트
-        currentSession.messages = [...currentSession.messages]
+        // 에러 상태 저장
         saveSessions()
       },
     })
   } catch (error) {
     console.error('메시지 전송 실패:', error)
-    botMessage.text = '네트워크 오류가 발생했습니다. 다시 시도해 주세요.'
-    botMessage.isStreaming = false
+    const currentBotMessage = currentSession.messages[botMessageIndex]
+    if (currentBotMessage) {
+      currentBotMessage.text = '네트워크 오류가 발생했습니다. 다시 시도해 주세요.'
+      currentBotMessage.isStreaming = false
+      currentBotMessage.answerCompleted = true
+      currentSession.lastMessage = '네트워크 오류'
+    }
     isMessageSending.value = false
     
-    // 에러 상태로 업데이트
-    currentSession.messages = [...currentSession.messages]
+    // 에러 상태 저장
     saveSessions()
   }
 }
@@ -433,6 +464,19 @@ function loadSessions() {
         session.updatedAt = new Date(session.updatedAt)
         session.messages.forEach((message) => {
           message.timestamp = new Date(message.timestamp)
+          
+          // 기존 메시지에 새로운 상태 필드가 없는 경우 추가
+          if (message.from === 'bot') {
+            if (message.isStreaming === undefined) {
+              message.isStreaming = false
+            }
+            if (message.answerCompleted === undefined) {
+              message.answerCompleted = true
+            }
+            if (message.showReferences === undefined) {
+              message.showReferences = true
+            }
+          }
         })
 
         // 기존 데이터에 number 필드가 없는 경우 추가
@@ -444,13 +488,6 @@ function loadSessions() {
         if (!session.documentFilters) {
           session.documentFilters = []
         }
-
-        // 기존 메시지에 isStreaming 필드가 없는 경우 추가
-        session.messages.forEach((message) => {
-          if (message.from === 'bot' && message.isStreaming === undefined) {
-            message.isStreaming = false
-          }
-        })
       })
 
       chatSessions.value = sessionData.sessions || []
@@ -537,6 +574,7 @@ onUnmounted(() => {
       :messages="messages"
       :is-sidebar-open="isSidebarOpen"
       :is-mobile="isMobile"
+      :is-message-sending="isMessageSending"
       @send="handleSend"
       @toggle-sidebar="toggleSidebar"
       @filter-change="handleFilterChange"

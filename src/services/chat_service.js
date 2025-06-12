@@ -114,17 +114,11 @@ export class ChatService {
     }
 
     /**
-     * 개별 스트림 이벤트 처리
+     * 개별 스트림 이벤트 처리 (개선된 버전)
      */
     static async handleStreamEvent(eventData, callbacks) {
         switch (eventData.type) {
-            case 'search_results':
-                console.log('검색 결과 수신:', eventData.data)
-                if (callbacks.onSearchResults) {
-                    callbacks.onSearchResults(eventData.data.searchResults || eventData.data)
-                }
-                break
-
+            // 답변 청크 처리
             case 'response_chunk':
             case 'chunk':
             case 'delta':
@@ -134,14 +128,32 @@ export class ChatService {
                 }
                 break
 
+            // 답변 완료 처리 (참조문서 표시 전)
+            case 'response_completed':
+                console.log('답변 스트리밍 완료')
+                if (callbacks.onResponseCompleted) {
+                    callbacks.onResponseCompleted()
+                }
+                break
+
+            // 검색 결과 처리 (답변 완료 후)
+            case 'search_results':
+                console.log('검색 결과 수신:', eventData.data)
+                if (callbacks.onSearchResults) {
+                    callbacks.onSearchResults(eventData.data.searchResults || eventData.data)
+                }
+                break
+
+            // 전체 프로세스 완료
             case 'completed':
             case 'done':
-                console.log('스트리밍 완료 이벤트 수신')
+                console.log('전체 스트리밍 프로세스 완료')
                 if (callbacks.onCompleted) {
                     callbacks.onCompleted()
                 }
                 break
 
+            // 에러 처리
             case 'error':
                 console.error('서버 에러:', eventData.data)
                 if (callbacks.onError) {
@@ -149,13 +161,22 @@ export class ChatService {
                 }
                 break
 
+            // 상태 업데이트
             case 'status':
                 console.log('상태 업데이트:', eventData.data)
-                // 상태 정보는 필요에 따라 처리
+                if (callbacks.onStatusUpdate) {
+                    callbacks.onStatusUpdate(eventData.data)
+                }
                 break
 
+            // 알 수 없는 이벤트 타입
             default:
                 console.warn('알 수 없는 이벤트 타입:', eventData.type, eventData)
+                // 하위 호환성을 위해 기본 청크 처리 시도
+                const fallbackChunk = eventData.data?.chunk || eventData.data?.content || eventData.content
+                if (fallbackChunk && callbacks.onResponseChunk) {
+                    callbacks.onResponseChunk(fallbackChunk)
+                }
         }
     }
 
@@ -198,6 +219,60 @@ export class ChatService {
         } catch (error) {
             console.error('채팅 요청 실패:', error)
             throw error
+        }
+    }
+
+    /**
+     * 디버깅을 위한 스트리밍 이벤트 모니터링
+     * @param {ReadableStream} stream - SSE 스트림
+     * @param {Function} onEvent - 이벤트 수신 시 호출될 함수
+     */
+    static async monitorStreamingEvents(stream, onEvent) {
+        const reader = stream.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let eventCount = 0
+
+        try {
+            while (true) {
+                const { value, done } = await reader.read()
+
+                if (done) {
+                    console.log(`스트림 모니터링 완료 - 총 ${eventCount}개 이벤트 처리됨`)
+                    break
+                }
+
+                const chunk = decoder.decode(value, { stream: true })
+                buffer += chunk
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+
+                for (const line of lines) {
+                    const trimmedLine = line.trim()
+                    if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                        try {
+                            const jsonStr = trimmedLine.substring(6)
+                            if (jsonStr && jsonStr !== '[DONE]') {
+                                const eventData = JSON.parse(jsonStr)
+                                eventCount++
+
+                                // 이벤트 정보 로깅
+                                console.log(`[이벤트 ${eventCount}] 타입: ${eventData.type}`, eventData.data)
+
+                                if (onEvent) {
+                                    onEvent(eventData, eventCount)
+                                }
+                            }
+                        } catch (parseError) {
+                            console.error('이벤트 파싱 실패:', parseError)
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('스트림 모니터링 오류:', error)
+        } finally {
+            reader.releaseLock()
         }
     }
 }

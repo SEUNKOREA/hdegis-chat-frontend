@@ -50,7 +50,11 @@
           <div
             v-for="(message, index) in messages"
             :key="`msg-${index}`"
-            :class="['message-bubble', `message-${message.from}`, { 'streaming': message.isStreaming }]"
+            :class="['message-bubble', `message-${message.from}`, { 
+              'streaming': message.isStreaming,
+              'answer-completed': message.answerCompleted,
+              'showing-references': message.showReferences
+            }]"
           >
             <!-- 사용자 메시지에 필터 정보 표시 -->
             <div
@@ -81,7 +85,7 @@
             </div>
 
             <div class="message-content">
-              <!-- 타이핑 애니메이션을 위한 개선된 텍스트 렌더링 -->
+              <!-- 봇 메시지 텍스트 렌더링 -->
               <div 
                 v-if="message.from === 'bot'"
                 class="bot-message-text"
@@ -90,17 +94,27 @@
               <div v-else>{{ message.text }}</div>
             </div>
 
-            <!-- 타이핑 인디케이터 -->
+            <!-- 타이핑 인디케이터 (답변이 시작되지 않았을 때만) -->
             <div v-if="message.from === 'bot' && message.isStreaming && !message.text" class="typing-indicator">
               <div class="typing-dots">
                 <span></span>
                 <span></span>
                 <span></span>
               </div>
+              <span class="typing-text">답변을 생성하고 있습니다...</span>
             </div>
 
-            <!-- 봇 메시지에 검색 결과 표시 -->
-            <div v-if="message.from === 'bot' && message.searchResults" class="search-results">
+            <!-- 참조문서 로딩 인디케이터 -->
+            <div v-if="message.from === 'bot' && message.answerCompleted && !message.showReferences && !message.searchResults?.length" 
+                 class="references-loading">
+              <div class="loading-spinner"></div>
+              <span class="loading-text">참조 문서를 불러오는 중...</span>
+            </div>
+
+            <!-- 봇 메시지에 검색 결과 표시 (애니메이션과 함께) -->
+            <div v-if="message.from === 'bot' && message.searchResults && message.showReferences" 
+                 class="search-results"
+                 :class="{ 'fade-in': message.showReferences }">
               <div class="search-results-header">
                 <h4>참조 문서 ({{ message.searchResults.length }}개)</h4>
               </div>
@@ -110,6 +124,7 @@
                   v-for="(result, resultIndex) in message.searchResults"
                   :key="resultIndex"
                   class="result-item"
+                  :style="{ animationDelay: `${resultIndex * 100}ms` }"
                   @click="showPdfResult(result)"
                 >
                   <div class="result-header">
@@ -153,9 +168,11 @@
               class="message-input"
               autocomplete="off"
               ref="chatInputRef"
+              :disabled="isMessageSending"
             />
-            <button type="submit" class="send-button" :disabled="!inputText.trim()">
-              <span class="send-icon">▶</span>
+            <button type="submit" class="send-button" :disabled="!inputText.trim() || isMessageSending">
+              <span v-if="!isMessageSending" class="send-icon">▶</span>
+              <div v-else class="sending-spinner"></div>
             </button>
           </form>
         </div>
@@ -182,6 +199,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isMessageSending: {
+    type: Boolean,
+    default: false,
+  }
 })
 
 // Emits: 부모 컴포넌트로 전달할 이벤트 정의
@@ -223,7 +244,7 @@ function formatBotMessage(text, isStreaming = false) {
  */
 function sendMessage() {
   const text = inputText.value.trim()
-  if (!text) return
+  if (!text || props.isMessageSending) return
 
   // 부모 컴포넌트로 메시지 전송 이벤트 발생 (필터 정보도 함께 전달)
   emit('send', {
@@ -672,7 +693,12 @@ onMounted(() => {
 .typing-indicator {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
   margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--color-background-soft);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border);
 }
 
 .typing-dots {
@@ -707,6 +733,45 @@ onMounted(() => {
   }
 }
 
+.typing-text {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  opacity: 0.7;
+}
+
+/* 참조문서 로딩 인디케이터 */
+.references-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--color-background-soft);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  opacity: 0.7;
+}
+
 /* 봇 메시지에 스트리밍 클래스 추가 시 스타일 */
 .message-bot.streaming .message-content {
   border-bottom-left-radius: 0.5rem;
@@ -737,6 +802,14 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.4s ease-out;
+}
+
+.search-results.fade-in {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .search-results-header {
@@ -770,6 +843,16 @@ onMounted(() => {
   background: var(--color-background-soft);
   min-width: 200px;
   flex-shrink: 0;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: slideInItem 0.3s ease-out forwards;
+}
+
+@keyframes slideInItem {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .result-item:hover {
@@ -890,6 +973,11 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
+.message-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .send-button {
   width: 48px;
   height: 48px;
@@ -925,6 +1013,28 @@ onMounted(() => {
 .send-icon {
   font-size: 1rem;
   margin-left: 2px;
+}
+
+/* 전송 중 스피너 */
+.sending-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* 애니메이션 키프레임 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 스크롤바 스타일링 */
@@ -1056,6 +1166,18 @@ onMounted(() => {
 
   * {
     transition: none !important;
+  }
+
+  .typing-cursor {
+    animation: none;
+  }
+
+  .search-results.fade-in {
+    animation: none;
+  }
+
+  .result-item {
+    animation: none;
   }
 }
 </style>
