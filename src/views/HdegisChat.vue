@@ -89,7 +89,7 @@ function generateSessionTitle(firstMessage, sessionNumber) {
 }
 
 /**
- * 사용자가 메시지를 전송했을 때 처리하는 함수 (개선된 스트리밍 처리)
+ * 사용자가 메시지를 전송했을 때 처리하는 함수 (타이핑 인디케이터 유지 버전)
  */
 async function handleSend(messageData) {
   if (isMessageSending.value) {
@@ -137,19 +137,18 @@ async function handleSend(messageData) {
   // 메시지 전송 시작
   isMessageSending.value = true
 
-  // 봇 응답 메시지 틀 먼저 추가 (스트리밍 상태로)
-  const botMessage = {
+  // ⭐ 타이핑 인디케이터용 임시 봇 메시지 생성 (텍스트는 비어있음)
+  const typingMessage = {
     from: 'bot',
-    text: '',
+    text: '', // 빈 텍스트로 타이핑 인디케이터 표시
     timestamp: new Date(),
     searchResults: [],
-    isStreaming: true, // 스트리밍 시작
-    answerCompleted: false, // 답변 완료 여부
-    showReferences: false, // 참조문서 표시 여부
+    isStreaming: true, // 타이핑 인디케이터 표시를 위해 true
+    answerCompleted: false,
+    showReferences: false,
   }
   
-  // 봇 메시지를 현재 세션에 추가
-  currentSession.messages.push(botMessage)
+  currentSession.messages.push(typingMessage)
   const botMessageIndex = currentSession.messages.length - 1
 
   try {
@@ -164,7 +163,7 @@ async function handleSend(messageData) {
     // 스트림 처리
     await ChatService.processStreamingResponse(stream, {
       onResponseChunk: (chunk) => {
-        // 답변 청크를 봇 메시지에 실시간으로 추가
+        // ⭐ 첫 번째 청크가 도착하면 타이핑 메시지를 실제 답변으로 변환
         const currentBotMessage = currentSession.messages[botMessageIndex]
         if (currentBotMessage) {
           currentBotMessage.text += chunk

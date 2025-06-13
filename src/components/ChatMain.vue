@@ -84,7 +84,7 @@
               </div>
             </div>
 
-            <div class="message-content">
+            <div class="message-content" v-if="message.text.trim()">
               <!-- 봇 메시지 텍스트 렌더링 -->
               <div 
                 v-if="message.from === 'bot'"
@@ -103,7 +103,7 @@
               </div>
               <span class="typing-text">답변을 생성하고 있습니다...</span>
             </div>
-
+            
             <!-- 참조문서 로딩 인디케이터 -->
             <div v-if="message.from === 'bot' && message.answerCompleted && !message.showReferences && !message.searchResults?.length" 
                  class="references-loading">
@@ -778,7 +778,7 @@ onMounted(() => {
   position: relative;
 }
 
-.message-bot.streaming .message-content::after {
+/* .message-bot.streaming .message-content::after {
   content: '';
   position: absolute;
   bottom: -1px;
@@ -792,7 +792,7 @@ onMounted(() => {
 @keyframes loading {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
-}
+} */
 
 /* 검색 결과 스타일 */
 .search-results {
