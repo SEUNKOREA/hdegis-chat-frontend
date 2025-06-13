@@ -95,38 +95,38 @@ const cards = [
   {
     title: '고압차단기 사내문서 QA 챗봇',
     description:
-      '기술 문서와 매뉴얼에 대한 즉시 답변을 받아보세요. 전문 지식을 쉽고 빠르게 검색할 수 있습니다.',
-    icon: '/src/assets/icons/hdegis-chat.png',
+      '기술 문서와 관련된 전문 지식을 쉽고 빠르게 검색할 수 있습니다.',
+    icon: '/icons/hdegis-chat.svg',
     route: '/hdegis-chat',
   },
   {
     title: '변압기 사양검토 자동화',
     description: '변압기 사양을 자동으로 분석하고 최적화된 검토 결과를 제공합니다.',
-    icon: '/src/assets/icons/hdetrf-spec.png',
+    icon: '/icons/hdetrf-spec.svg',
     route: '/hdetrf-spec',
   },
   {
     title: '회전기 사양검토 자동화',
     description: '회전기 설계 사양을 스마트하게 검토하고 개선 방안을 제안합니다.',
-    icon: '/src/assets/icons/hdermd-spec.png',
+    icon: '/icons/hdermd-spec.svg',
     route: '/hdermd-spec',
   },
   {
     title: 'INTEGRICT 전력기기 진단 서비스',
     description: 'AI 기반 전력기기 상태 진단으로 예방 정비와 안전 관리를 지원합니다.',
-    icon: '/src/assets/icons/hdeintg-analysis.png',
+    icon: '/icons/hdeintg-anly.svg',
     route: '/hdeintg-analysis',
   },
   {
     title: '설비 최적화 AI 어시스턴트',
     description: '설비 운영 데이터를 분석하여 최적화 방안을 제안하는 차세대 AI 서비스입니다.',
-    icon: '/src/assets/icons/hde-tmp-1.png',
+    icon: '/icons/hde-tmp-1.svg',
     route: '/pending',
   },
   {
     title: '스마트 품질관리 시스템',
     description: 'AI 기반 품질 검사 및 관리 시스템으로 제품 품질을 한 단계 높여보세요.',
-    icon: '/src/assets/icons/hde-tmp-2.png',
+    icon: '/icons/hde-tmp-2.svg',
     route: '/pending',
   },
 ]

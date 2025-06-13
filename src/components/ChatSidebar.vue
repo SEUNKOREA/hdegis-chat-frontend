@@ -18,7 +18,7 @@
     <!-- 헤더 영역: 로고 및 타이틀 -->
     <header class="sidebar-header">
       <div class="branding" @click="goHome" :class="{ clickable: props.isOpen }">
-        <img src="@/assets/icons/hdegis-chat.png" alt="HD-Agent 로고" class="logo" />
+        <img src="/icons/hdegis-chat.svg" alt="HD-Agent 로고" class="logo" />
         <h2 v-show="props.isOpen" class="brand-title">HD-Agent</h2>
       </div>
       <p v-show="props.isOpen" class="brand-caption">고압차단기 사내문서 QA 챗봇</p>

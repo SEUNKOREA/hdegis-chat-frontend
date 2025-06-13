@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <!-- 배경 원 -->
+  <circle cx="100" cy="100" r="95" fill="#2CA89A" /> <!-- 청록색 계열 -->
+
+  <!-- 회전기 본체 -->
+  <rect x="50" y="60" width="100" height="80" fill="white" rx="5" />
+
+  <!-- 안쪽 회전체 -->
+  <circle cx="100" cy="100" r="20" stroke="#2CA89A" stroke-width="6" fill="none" />
+
+  <!-- 중심 축 -->
+  <line x1="100" y1="80" x2="100" y2="120" stroke="#2CA89A" stroke-width="4" />
+  <circle cx="100" cy="100" r="4" fill="#2CA89A" />
+
+  <!-- 좌우 샤프트 돌출 -->
+  <rect x="45" y="90" width="5" height="20" fill="white" />
+  <rect x="150" y="90" width="5" height="20" fill="white" />
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <circle cx="100" cy="100" r="95" fill="#6DA34D"/>
+  <!-- 말풍선 -->
+  <path d="M60 70 h80 a10 10 0 0 1 10 10 v40 a10 10 0 0 1 -10 10 h-40 l-15 15 v-15 h-25 a10 10 0 0 1 -10 -10 v-40 a10 10 0 0 1 10 -10 z" fill="white"/>
+  <!-- 코드 기호 -->
+  <text x="85" y="105" font-size="28" font-family="monospace" fill="#6DA34D">&lt;/&gt;</text>
+</svg>

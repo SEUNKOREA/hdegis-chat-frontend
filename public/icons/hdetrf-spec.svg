@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <circle cx="100" cy="100" r="95" fill="#F28C28"/>
+
+  <!-- 변압기 본체 라디에이터 핀 (세로 바) -->
+  <rect x="55" y="60" width="90" height="80" rx="6" fill="white"/>
+  <line x1="65" y1="60" x2="65" y2="140" stroke="#F28C28" stroke-width="4"/>
+  <line x1="80" y1="60" x2="80" y2="140" stroke="#F28C28" stroke-width="4"/>
+  <line x1="95" y1="60" x2="95" y2="140" stroke="#F28C28" stroke-width="4"/>
+  <line x1="110" y1="60" x2="110" y2="140" stroke="#F28C28" stroke-width="4"/>
+  <line x1="125" y1="60" x2="125" y2="140" stroke="#F28C28" stroke-width="4"/>
+</svg>
